@@ -8,3 +8,8 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Application rules
+- Keep the product-management prototype frontend-only with transient React state; the requested delivery excludes backend and persistent storage.
+- Keep generic product/group/option models separate from editing and customer-preview UI so weekly rules do not depend on group names.
+- Define all interface styling and semantic color tokens in src/styles.css for a consistent design system.

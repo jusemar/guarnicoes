@@ -1,0 +1,43 @@
+import { useState } from 'react';
+import { Plus, Trash2, GripVertical, CalendarDays, Copy, Info, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { days, type OptionGroup } from '@/lib/menu-demo';
+
+export function GroupEditor({ group, onClose, onSave, onDelete }: { group: OptionGroup; onClose: () => void; onSave: (group: OptionGroup) => void; onDelete: () => void }) {
+ const [draft, setDraft] = useState<OptionGroup>(structuredClone(group));
+ const [tab, setTab] = useState('options');
+ const [day, setDay] = useState(0);
+ const [copy, setCopy] = useState(false);
+ const [targets, setTargets] = useState<number[]>([]);
+ const [error, setError] = useState('');
+ const change = (values: Partial<OptionGroup>) => setDraft(d => ({ ...d, ...values }));
+ const editOption = (id: string, values: Partial<OptionGroup['options'][number]>) => setDraft(d => ({...d, options: d.options.map(o => o.id === id ? {...o,...values} : o)}));
+ const toggleWeekly = (weekly: boolean) => setDraft(d => ({ ...d, weekly, initialized: d.initialized || weekly, options: weekly && !d.initialized ? d.options.map(o => ({...o, days:[0,1,2,3,4,5,6]})) : d.options }));
+ const save = () => { if (!draft.name.trim() || draft.options.some(o => !o.name.trim())) return setError('Preencha o nome do grupo e de todas as opções.'); if (draft.min > draft.max || draft.min < 0 || draft.max < 1) return setError('O máximo deve ser pelo menos 1 e não pode ser menor que o mínimo.'); onSave(draft); };
+ const applyCopy = () => { const selected = draft.options.filter(o => o.days.includes(day)).map(o => o.id); change({ options: draft.options.map(o => ({...o, days:[...o.days.filter(d => !targets.includes(d)), ...(selected.includes(o.id) ? targets : [])]})) }); setCopy(false); setTargets([]); };
+ return <Dialog open onOpenChange={open => !open && onClose()}><DialogContent className="group-modal modal-content">
+  <div><DialogTitle>{group.name ? 'Editar grupo de opções' : 'Novo grupo de opções'}</DialogTitle><DialogDescription className="mt-2">{group.name || 'Personalização do produto'}</DialogDescription></div>
+  <div className="tab-strip"><Button variant="ghost" className={tab === 'options' ? 'selected' : ''} onClick={() => setTab('options')}>Opções e regras <span className="pill">{draft.options.length}</span></Button><Button variant="ghost" className={tab === 'weekly' ? 'selected' : ''} onClick={() => setTab('weekly')}><CalendarDays/> Programação semanal</Button></div>
+  {tab === 'options' ? <div>
+   <div className="fields mt-5"><div className="field"><label htmlFor="group-name">Nome do grupo</label><input id="group-name" placeholder="Ex.: Acompanhamentos" value={draft.name} onChange={e => change({name:e.target.value})}/></div><div className="field"><label htmlFor="instruction">Instrução para o cliente</label><input id="instruction" placeholder="Ex.: Escolha seus favoritos" value={draft.instruction} onChange={e => change({instruction:e.target.value})}/></div><div className="two-cols"><div className="field"><label htmlFor="min">Mínimo de escolhas</label><input id="min" type="number" min="0" value={draft.min} onChange={e => change({min:Number(e.target.value)})}/><span className="field-hint">0 para tornar o grupo opcional.</span></div><div className="field"><label htmlFor="max">Máximo de escolhas</label><input id="max" type="number" min="1" value={draft.max} onChange={e => change({max:Number(e.target.value)})}/><span className="field-hint">Limite de opções por pedido.</span></div></div></div>
+   <div className="option-row option-head"><span className="grip"/><span>OPÇÃO</span><span>ACRÉSCIMO (R$)</span><span>ATIVA</span><span/></div>
+   {draft.options.map((o,index) => <div className="option-row" key={o.id}><Button variant="ghost" size="icon" className="grip h-7 w-6 text-muted-foreground" title="Mover opção para cima" aria-label={`Mover ${o.name} para cima`} disabled={index===0} onClick={() => {const next = [...draft.options]; [next[index-1],next[index]]=[next[index],next[index-1]];change({options:next});}}><GripVertical/></Button><input aria-label={`Nome da opção ${index+1}`} value={o.name} onChange={e => editOption(o.id,{name:e.target.value})}/><input aria-label={`Acréscimo de ${o.name}`} type="number" min="0" step="0.5" value={o.price} onChange={e => editOption(o.id,{price:Math.max(0,Number(e.target.value))})}/><Switch aria-label={`Disponibilidade de ${o.name}`} checked={o.available} onCheckedChange={available => editOption(o.id,{available})}/><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title="Excluir opção" aria-label={`Excluir ${o.name}`} onClick={() => change({options:draft.options.filter(x => x.id!==o.id)})}><Trash2/></Button></div>)}
+   <Button variant="outline" size="sm" className="mt-4" onClick={() => change({options:[...draft.options,{id:crypto.randomUUID(),name:'',price:0,available:true,days:draft.weekly ? [] : [0,1,2,3,4,5,6]}]})}><Plus/> Adicionar opção</Button>
+  </div> : <div>
+   <div className="flex items-center justify-between gap-4 mt-5"><div><h3 className="font-semibold text-sm">Programação semanal</h3><p className="field-hint mt-1">Disponibilidade diferente para cada dia da semana.</p></div><Switch aria-label="Ativar programação semanal" checked={draft.weekly} onCheckedChange={toggleWeekly}/></div>
+   {!draft.weekly ? <div className="bg-muted rounded-md p-5 mt-5 flex gap-3"><CalendarDays className="text-muted-foreground shrink-0"/><div><p className="text-sm font-medium">As opções estão disponíveis todos os dias</p><p className="field-hint mt-1">{draft.initialized ? 'Sua programação está guardada e será recuperada ao reativar.' : 'Ao ativar, as opções atuais serão mantidas em todos os dias.'}</p></div></div> : <>
+   <div className="week-days">{days.map((d,i) => <Button key={d} variant={day === i ? 'default' : 'outline'} onClick={() => {setDay(i);setCopy(false);}}>{d.slice(0,3)}<span className={day===i ? '' : 'text-muted-foreground'}>{draft.options.filter(o => o.days.includes(i)&&o.available).length} opções</span></Button>)}</div>
+   <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">{days[day]}-feira{day>4 ? '' : ''}</h3><Button variant="ghost" size="sm" onClick={() => setCopy(!copy)}><Copy/> Copiar para outros dias</Button></div>
+   {copy && <div className="bg-muted p-4 rounded-md mt-3"><p className="text-xs mb-3">Aplicar opções de {days[day].toLowerCase()} em:</p><div className="flex flex-wrap gap-3">{days.map((d,i) => i !== day && <label key={d} className="flex items-center gap-2"><input type="checkbox" checked={targets.includes(i)} onChange={() => setTargets(t => t.includes(i) ? t.filter(x => x!==i) : [...t,i])}/>{d}</label>)}</div><div className="flex justify-end mt-3"><Button size="sm" disabled={!targets.length} onClick={applyCopy}><Check/> Aplicar</Button></div></div>}
+   {draft.options.length===0 && <p className="text-muted-foreground text-sm py-8">Adicione opções na aba Opções e regras.</p>}
+   {draft.options.map(o => <div className="schedule-option" key={o.id}><input id={`schedule-${o.id}`} type="checkbox" checked={o.days.includes(day)} onChange={() => editOption(o.id,{days:o.days.includes(day) ? o.days.filter(d => d!==day) : [...o.days,day]})}/><label htmlFor={`schedule-${o.id}`} className={!o.available ? 'text-muted-foreground' : ''}>{o.name}</label>{!o.available && <span className="pill amber">Indisponível</span>}</div>)}
+   <div className="flex gap-2 mt-4 field-hint"><Info size={14} className="shrink-0"/><p>Opções indisponíveis não aparecem no cardápio, mesmo quando programadas.</p></div>
+   {draft.options.filter(o => o.available && o.days.includes(day)).length < draft.min && <p className="text-warning bg-warning-soft text-xs p-3 mt-3 rounded-md">Este dia tem menos opções disponíveis que o mínimo de {draft.min} escolhas.</p>}
+   </>}
+  </div>}
+  {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
+  <div className="modal-footer"><Button variant="ghost" className="text-destructive" size="sm" onClick={onDelete} disabled={!group.name}><Trash2/> Excluir grupo</Button><div className="flex gap-2"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={save}><Check/> Salvar grupo</Button></div></div>
+ </DialogContent></Dialog>;
+}
