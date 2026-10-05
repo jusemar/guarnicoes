@@ -13,3 +13,4 @@
 - Keep the product-management prototype frontend-only with transient React state; the requested delivery excludes backend and persistent storage.
 - Keep generic product/group/option models separate from editing and customer-preview UI so weekly rules do not depend on group names.
 - Define all interface styling and semantic color tokens in src/styles.css for a consistent design system.
+- Pre-bundle the editor's React and UI dependencies in Vite optimizeDeps to avoid initial-preview dependency discovery replacing the React graph mid-render.
